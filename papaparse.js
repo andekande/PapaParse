@@ -449,7 +449,7 @@
 			if (!finishedIncludingPreview && (!results || !results.meta.paused))
 				this._nextChunk();
 
-			return results;
+			return this._completeResults;
 		};
 
 		this._sendError = function(error)
@@ -741,6 +741,14 @@
 				_results.meta.delimiter = _config.delimiter;
 			}
 
+            if (!_config.quoteChar)
+		    {
+                if (input.substr(0, 1) === "'" && input.substr(input.indexOf(_config.delimiter, 0) - 1, 1) === "'")
+                    _config.quoteChar = "'";
+			    else
+                    _config.quoteChar = '"';
+            }
+
 			var parserConfig = copy(_config);
 			if (_config.preview && _config.header)
 				parserConfig.preview++;	// to compensate for header row
@@ -972,6 +980,11 @@
 		var step = config.step;
 		var preview = config.preview;
 		var fastMode = config.fastMode;
+		var quoteChar = config.quoteChar;
+
+	    // Quote Character defaults to DoubleQuote
+		if (typeof quoteChar !== 'string')
+		    quoteChar = '"';
 
 		// Delimiter must be valid
 		if (typeof delim !== 'string'
@@ -1016,7 +1029,7 @@
 			if (!input)
 				return returnable();
 
-			if (fastMode || (fastMode !== false && input.indexOf('"') === -1))
+			if (fastMode || (fastMode !== false && input.indexOf(quoteChar) === -1))
 			{
 				var rows = input.split(newline);
 				for (var i = 0; i < rows.length; i++)
@@ -1055,7 +1068,7 @@
 			for (;;)
 			{
 				// Field has opening quote
-				if (input[cursor] == '"')
+				if (input[cursor] == quoteChar)
 				{
 					// Start our search for the closing quote where the cursor is
 					var quoteSearch = cursor;
@@ -1066,7 +1079,7 @@
 					for (;;)
 					{
 						// Find closing quote
-						var quoteSearch = input.indexOf('"', quoteSearch+1);
+						var quoteSearch = input.indexOf(quoteChar, quoteSearch+1);
 
 						if (quoteSearch === -1)
 						{
@@ -1086,12 +1099,12 @@
 						if (quoteSearch === inputLen-1)
 						{
 							// Closing quote at EOF
-							var value = input.substring(cursor, quoteSearch).replace(/""/g, '"');
+							var value = input.substring(cursor, quoteSearch).replace(new RegExp(quoteChar+quoteChar,"g"), quoteChar);
 							return finish(value);
 						}
 
 						// If this quote is escaped, it's part of the data; skip it
-						if (input[quoteSearch+1] == '"')
+						if (input[quoteSearch+1] == quoteChar)
 						{
 							quoteSearch++;
 							continue;
@@ -1100,7 +1113,7 @@
 						if (input[quoteSearch+1] == delim)
 						{
 							// Closing quote followed by delimiter
-							row.push(input.substring(cursor, quoteSearch).replace(/""/g, '"'));
+							row.push(input.substring(cursor, quoteSearch).replace(new RegExp(quoteChar+quoteChar,"g"), quoteChar));
 							cursor = quoteSearch + 1 + delimLen;
 							nextDelim = input.indexOf(delim, cursor);
 							nextNewline = input.indexOf(newline, cursor);
@@ -1110,7 +1123,7 @@
 						if (input.substr(quoteSearch+1, newlineLen) === newline)
 						{
 							// Closing quote followed by newline
-							row.push(input.substring(cursor, quoteSearch).replace(/""/g, '"'));
+							row.push(input.substring(cursor, quoteSearch).replace(new RegExp(quoteChar+quoteChar,"g"), quoteChar));
 							saveRow(quoteSearch + 1 + newlineLen);
 							nextDelim = input.indexOf(delim, cursor);	// because we may have skipped the nextDelim in the quoted field
 
